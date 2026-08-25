@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Análise Diagnóstica - Cotas UEPG</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <!-- Chart.js 4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- styles.css -->
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+    <div class="container py-4">
+
+        <!-- ========== CABEÇALHO ========== -->
+        <header class="text-center mb-5">
+            <h1 class="display-5">
+                <i class="fas fa-chart-line"></i> Análise Diagnóstica
+            </h1>
+            <p class="lead text-muted">
+                Evolução da demanda por curso e tipo de cota (2016-2025)
+            </p>
+            <hr />
+            <p class="text-muted small">
+                Passe o mouse sobre os pontos para ver a quantidade de candidatos por ano e tipo de cota.
+            </p>
+        </header>
+
+        <!-- ========== 4 GRÁFICOS INDIVIDUAIS ========== -->
+        <div class="row">
+
+            <!-- GRÁFICO 1: Engenharia Civil -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-hard-hat me-2"></i> Engenharia Civil
+                    </div>
+                    <div class="card-body">
+                        <canvas id="chartEngCivil"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRÁFICO 2: Direito -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-scale-balanced me-2"></i> Direito
+                    </div>
+                    <div class="card-body">
+                        <canvas id="chartDireito"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRÁFICO 3: Educação Física - Bacharelado -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-dumbbell me-2"></i> Educação Física (Bacharelado)
+                    </div>
+                    <div class="card-body">
+                        <canvas id="chartEduFisica"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRÁFICO 4: Engenharia de Alimentos -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-apple-alt me-2"></i> Engenharia de Alimentos
+                    </div>
+                    <div class="card-body">
+                        <canvas id="chartEngAlimentos"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========== ANÁLISE DIAGNÓSTICA ========== -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-stethoscope me-2"></i> Análise Diagnóstica
+            </div>
+            <div class="card-body" id="analiseContainer">
+                <p class="text-muted text-center">
+                    <i class="fas fa-spinner fa-spin me-2"></i> Carregando análise...
+                </p>
+            </div>
+        </div>
+
+        <!-- ========== RODAPÉ ========== -->
+        <footer class="text-center text-muted mt-4 fonte">
+            <i class="fas fa-database me-1"></i> Dados: UEPG - Levantamento de Cotas (2016-2025)
+            <br />
+            <span class="small">Fonte: <a href="#">salario.com.br</a></span>
+        </footer>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="db.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>
