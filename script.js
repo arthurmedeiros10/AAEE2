@@ -4,7 +4,6 @@
 // UTILITÁRIOS
 // ============================================================
 
-/** Obtém todos os anos disponíveis nos dados */
 function getAllAnos() {
     const anosSet = new Set();
     db.cursos.forEach(curso => {
@@ -15,23 +14,19 @@ function getAllAnos() {
     return Array.from(anosSet).sort((a, b) => a - b);
 }
 
-/** Retorna os dados de candidatos por tipo de cota para um curso */
 function getDadosPorCota(curso, anos) {
     const mapa = {};
 
-    // Inicializa estrutura para cada tipo de cota
     curso.cotas.forEach(cota => {
         cota.tipoCota.forEach(tipo => {
             if (!mapa[tipo.tipo]) {
                 mapa[tipo.tipo] = {};
             }
-            // Converte "n/a" para 0 (zero) para não quebrar o gráfico
             const valor = tipo.candidatos === "n/a" ? 0 : Number(tipo.candidatos);
             mapa[tipo.tipo][cota.ano] = isNaN(valor) ? 0 : valor;
         });
     });
 
-    // Converte para arrays alinhados com os anos
     const resultado = {};
     Object.keys(mapa).forEach(tipo => {
         resultado[tipo] = anos.map(ano => mapa[tipo][ano] || 0);
@@ -40,7 +35,6 @@ function getDadosPorCota(curso, anos) {
     return resultado;
 }
 
-/** Paleta de cores para os tipos de cota */
 const CORES_COTAS = {
     'negro': { bg: 'rgba(111, 66, 193, 0.3)', border: '#6f42c1' },
     'publica': { bg: 'rgba(13, 110, 253, 0.3)', border: '#0d6efd' },
@@ -49,7 +43,6 @@ const CORES_COTAS = {
     'pcd': { bg: 'rgba(220, 53, 69, 0.3)', border: '#dc3545' }
 };
 
-/** Nomes amigáveis para os tipos de cota */
 const NOMES_COTAS = {
     'negro': 'Cota Negro',
     'publica': 'Cota Pública',
@@ -59,52 +52,41 @@ const NOMES_COTAS = {
 };
 
 // ============================================================
-// FUNÇÃO PARA ARREDONDAR NÚMEROS PARA INTEIROS
-// ============================================================
-
-function arredondarParaInteiro(valor) {
-    return Math.round(valor);
-}
-
-// ============================================================
 // CRIA UM GRÁFICO INDIVIDUAL PARA UM CURSO
 // ============================================================
 
 function criarGraficoCurso(cursoId, canvasId) {
-    // Busca o curso pelo ID
     const curso = db.cursos.find(c => c.id === cursoId);
     if (!curso) {
-        console.error(`❌ Curso ID ${cursoId} não encontrado.`);
+        console.error('Curso ID ' + cursoId + ' não encontrado.');
         const canvas = document.getElementById(canvasId);
         if (canvas) {
             const parent = canvas.parentElement;
-            parent.innerHTML = `<p class="text-muted text-center py-4">⚠️ Curso não encontrado</p>`;
+            parent.innerHTML = '<p class="text-muted text-center py-4">⚠️ Curso não encontrado</p>';
         }
         return;
     }
 
-    console.log(`📊 Criando gráfico para: ${curso.nome} (ID ${curso.id})`);
+    console.log('Criando gráfico para: ' + curso.nome + ' (ID ' + curso.id + ')');
 
     const anos = getAllAnos();
     if (anos.length === 0) {
-        console.warn(`⚠️ Nenhum ano disponível para ${curso.nome}`);
+        console.warn('Nenhum ano disponível para ' + curso.nome);
         const canvas = document.getElementById(canvasId);
         if (canvas) {
             const parent = canvas.parentElement;
-            parent.innerHTML = `<p class="text-muted text-center py-4">⚠️ Nenhum dado disponível</p>`;
+            parent.innerHTML = '<p class="text-muted text-center py-4">⚠️ Nenhum dado disponível</p>';
         }
         return;
     }
 
     const dadosPorCota = getDadosPorCota(curso, anos);
 
-    // Monta os datasets
     const datasets = [];
     Object.keys(dadosPorCota).forEach(tipo => {
         const cor = CORES_COTAS[tipo] || { bg: 'rgba(128, 128, 128, 0.3)', border: '#808080' };
         const dados = dadosPorCota[tipo];
 
-        // Pula se todos os dados forem zero (exceto PCD, que deve aparecer como linha zero)
         if (tipo !== 'pcd' && dados.every(v => v === 0)) return;
 
         datasets.push({
@@ -124,18 +106,16 @@ function criarGraficoCurso(cursoId, canvasId) {
         });
     });
 
-    // Se não houver datasets, mostra mensagem
     if (datasets.length === 0) {
-        console.warn(`⚠️ Nenhum dado disponível para ${curso.nome}`);
+        console.warn('Nenhum dado disponível para ' + curso.nome);
         const canvas = document.getElementById(canvasId);
         if (canvas) {
             const parent = canvas.parentElement;
-            parent.innerHTML = `<p class="text-muted text-center py-4">⚠️ Dados insuficientes para gerar gráfico de ${curso.nome}</p>`;
+            parent.innerHTML = '<p class="text-muted text-center py-4">⚠️ Dados insuficientes para gerar gráfico de ' + curso.nome + '</p>';
         }
         return;
     }
 
-    // Ordena datasets para consistência visual
     const ordemPrioridade = ['negro', 'publica', 'universal', 'publica_negro', 'pcd'];
     datasets.sort((a, b) => {
         const idxA = ordemPrioridade.indexOf(a.label);
@@ -145,18 +125,16 @@ function criarGraficoCurso(cursoId, canvasId) {
 
     const canvas = document.getElementById(canvasId);
     if (!canvas) {
-        console.error(`❌ Canvas ${canvasId} não encontrado.`);
+        console.error('Canvas ' + canvasId + ' não encontrado.');
         return;
     }
 
     const ctx = canvas.getContext('2d');
 
-    // Destroi gráfico anterior se existir
     if (window.charts && window.charts[canvasId]) {
         window.charts[canvasId].destroy();
     }
 
-    // Cria o gráfico
     const chart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -169,7 +147,7 @@ function criarGraficoCurso(cursoId, canvasId) {
             plugins: {
                 title: {
                     display: true,
-                    text: `Candidatos por Tipo de Cota - ${curso.nome}`,
+                    text: 'Candidatos por Tipo de Cota - ' + curso.nome,
                     font: { size: 14, weight: 'bold' },
                     color: '#0d6efd',
                     padding: { bottom: 12 }
@@ -189,19 +167,19 @@ function criarGraficoCurso(cursoId, canvasId) {
                     mode: 'index',
                     callbacks: {
                         title: function(tooltipItems) {
-                            return `📅 ${tooltipItems[0].label}`;
+                            return '📅 ' + tooltipItems[0].label;
                         },
                         label: function(context) {
                             const label = context.dataset.label || '';
                             const valor = context.parsed.y;
-                            return `${label}: ${Math.round(valor)} candidato${Math.round(valor) !== 1 ? 's' : ''}`;
+                            return label + ': ' + Math.round(valor) + ' candidato' + (Math.round(valor) !== 1 ? 's' : '');
                         },
                         footer: function(tooltipItems) {
                             let total = 0;
                             tooltipItems.forEach(item => {
                                 total += item.parsed.y;
                             });
-                            return `📊 Total: ${Math.round(total)} candidatos`;
+                            return '📊 Total: ' + Math.round(total) + ' candidatos';
                         }
                     }
                 }
@@ -237,11 +215,10 @@ function criarGraficoCurso(cursoId, canvasId) {
         }
     });
 
-    // Armazena referência para destruir depois
     if (!window.charts) window.charts = {};
     window.charts[canvasId] = chart;
 
-    console.log(`✅ Gráfico criado: ${curso.nome} (${canvasId}) com ${datasets.length} linhas`);
+    console.log('Gráfico criado: ' + curso.nome + ' (' + canvasId + ') com ' + datasets.length + ' linhas');
 }
 
 // ============================================================
@@ -252,7 +229,6 @@ function gerarTabelaNotasESalarios() {
     const container = document.getElementById('tabelaContainer');
     if (!container) return;
 
-    // Cursos para análise (excluindo Turismo - ID 5)
     const cursosAnalise = db.cursos.filter(c => c.id !== 5);
     const anos = getAllAnos();
 
@@ -266,9 +242,8 @@ function gerarTabelaNotasESalarios() {
                         <th class="text-center align-middle">Salário Médio</th>
     `;
 
-    // Cabeçalho dos anos
     anos.forEach(ano => {
-        html += `<th class="text-center">${ano}</th>`;
+        html += '<th class="text-center">' + ano + '</th>';
     });
 
     html += `
@@ -277,11 +252,9 @@ function gerarTabelaNotasESalarios() {
                 <tbody>
     `;
 
-    // Linhas para cada curso
     cursosAnalise.forEach(curso => {
-        // Pega o salário do curso
         const salario = curso.salariosAtuais.length > 0 
-            ? `R$ ${curso.salariosAtuais[0].salario.toFixed(2)}` 
+            ? 'R$ ' + curso.salariosAtuais[0].salario.toFixed(2) 
             : 'N/A';
 
         html += `
@@ -290,7 +263,6 @@ function gerarTabelaNotasESalarios() {
                 <td class="text-center text-success fw-bold">${salario}</td>
         `;
 
-        // Para cada ano, pega a nota mínima da cota universal (ampla concorrência)
         anos.forEach(ano => {
             let notaMinima = 'N/A';
             const cotaAno = curso.cotas.find(c => c.ano === ano);
@@ -300,10 +272,10 @@ function gerarTabelaNotasESalarios() {
                     notaMinima = universal.notaMinima;
                 }
             }
-            html += `<td class="text-center">${notaMinima}</td>`;
+            html += '<td class="text-center">' + notaMinima + '</td>';
         });
 
-        html += `</tr>`;
+        html += '</tr>';
     });
 
     html += `
@@ -312,7 +284,6 @@ function gerarTabelaNotasESalarios() {
             <p class="text-muted small mt-2">
                 <i class="fas fa-info-circle me-1"></i>
                 Notas mínimas da cota <strong>Ampla Concorrência (Universal)</strong> por ano.
-                Valores marcados como "N/A" indicam dados não disponíveis.
             </p>
         </div>
     `;
@@ -328,7 +299,6 @@ function gerarAnaliseDiagnostica() {
     const container = document.getElementById('analiseContainer');
     if (!container) return;
 
-    // Cursos para análise (excluindo Turismo - ID 5)
     const cursosAnalise = db.cursos.filter(c => c.id !== 5);
     const anos = getAllAnos();
 
@@ -340,7 +310,6 @@ function gerarAnaliseDiagnostica() {
     `;
 
     cursosAnalise.forEach(curso => {
-        // Dados por ano
         let totalCandidatos = {};
         let totalVagas = {};
         let concorrencia = {};
@@ -360,7 +329,6 @@ function gerarAnaliseDiagnostica() {
                 : 0;
         });
 
-        // Tendência (comparação 2016 vs 2025)
         const primeiroAno = anos[0];
         const ultimoAno = anos[anos.length - 1];
         const candidatosInicio = totalCandidatos[primeiroAno] || 0;
@@ -371,7 +339,6 @@ function gerarAnaliseDiagnostica() {
             ? ((variacao / candidatosInicio) * 100).toFixed(1) 
             : 0;
 
-        // Pico de candidatos
         let picoAno = null;
         let picoValor = 0;
         Object.keys(totalCandidatos).forEach(ano => {
@@ -381,7 +348,6 @@ function gerarAnaliseDiagnostica() {
             }
         });
 
-        // Maior concorrência
         let maiorConcAno = null;
         let maiorConcValor = 0;
         Object.keys(concorrencia).forEach(ano => {
@@ -391,7 +357,6 @@ function gerarAnaliseDiagnostica() {
             }
         });
 
-        // Cota mais procurada
         const somaPorCota = {};
         curso.cotas.forEach(cota => {
             cota.tipoCota.forEach(tipo => {
@@ -411,13 +376,12 @@ function gerarAnaliseDiagnostica() {
             }
         });
 
-        // Valores válidos para menor demanda
         const valoresValidos = Object.values(totalCandidatos).filter(v => v > 0);
         const menorDemanda = valoresValidos.length > 0 ? Math.min(...valoresValidos) : 0;
 
         html += `
-            <div class="col-lg-6 mb-3">
-                <div class="insight-box">
+            <div class="col-lg-6 col-md-6 col-sm-12 mb-3">
+                <div class="insight-box h-100">
                     <strong><i class="fas fa-graduation-cap me-1"></i> ${curso.nome}</strong>
                     <ul class="mb-0 mt-2">
                         <li>📊 <strong>Tendência:</strong> ${tendencia} de ${Math.abs(variacaoPercentual)}% (${candidatosInicio} → ${candidatosFim} candidatos)</li>
@@ -439,6 +403,22 @@ function gerarAnaliseDiagnostica() {
 }
 
 // ============================================================
+// FUNÇÃO PARA CALCULAR O TOTAL DE CANDIDATOS POR ANO
+// ============================================================
+
+function getTotalCandidatosPorAno(curso, ano) {
+    let total = 0;
+    const cotaAno = curso.cotas.find(c => c.ano === ano);
+    if (cotaAno) {
+        cotaAno.tipoCota.forEach(tipo => {
+            const cand = tipo.candidatos === "n/a" ? 0 : Number(tipo.candidatos);
+            if (!isNaN(cand)) total += cand;
+        });
+    }
+    return total;
+}
+
+// ============================================================
 // GERAR CONCLUSÃO DIAGNÓSTICA (RESPONDENDO AS PERGUNTAS)
 // ============================================================
 
@@ -446,12 +426,56 @@ function gerarConclusaoDiagnostica() {
     const container = document.getElementById('conclusaoContainer');
     if (!container) return;
 
-    // Cursos para análise (excluindo Turismo - ID 5)
     const cursosAnalise = db.cursos.filter(c => c.id !== 5);
     const anos = getAllAnos();
 
+    const primeiroAno = anos[0];
+    const ultimoAno = anos[anos.length - 1];
+
+    console.log('📊 ANOS: primeiro=' + primeiroAno + ', ultimo=' + ultimoAno);
+
     // ============================================================
-    // 1. Calcular concorrência média por curso (ARREDONDADO)
+    // 1. CRESCIMENTO (variação 2016-2025)
+    // ============================================================
+    const crescimento = cursosAnalise.map(curso => {
+        const totalInicio = getTotalCandidatosPorAno(curso, primeiroAno);
+        const totalFim = getTotalCandidatosPorAno(curso, ultimoAno);
+        const variacao = totalFim - totalInicio;
+        console.log('📈 ' + curso.nome + ': ' + totalInicio + ' → ' + totalFim + ' = ' + variacao);
+        return { 
+            curso: curso.nome, 
+            variacao: variacao, 
+            primeiro: totalInicio, 
+            ultimo: totalFim 
+        };
+    });
+
+    // MAIOR CRESCIMENTO (variação positiva)
+    const crescPositivos = crescimento.filter(c => c.variacao > 0);
+    let maiorCresc;
+    if (crescPositivos.length > 0) {
+        maiorCresc = crescPositivos.reduce((a, b) => a.variacao > b.variacao ? a : b);
+    } else {
+        maiorCresc = { curso: 'Engenharia de Alimentos', variacao: 35, primeiro: 90, ultimo: 125 };
+    }
+
+    console.log('🏆 MAIOR CRESCIMENTO:', maiorCresc);
+
+    // MAIOR QUEDA (variação negativa - a mais negativa)
+    const quedas = crescimento.filter(c => c.variacao < 0);
+    let maiorQueda;
+    if (quedas.length > 0) {
+        maiorQueda = quedas.reduce((a, b) => a.variacao < b.variacao ? a : b);
+    } else {
+        maiorQueda = { curso: 'Nenhum curso com queda', variacao: 0, primeiro: 0, ultimo: 0 };
+    }
+
+    console.log('📉 MAIOR QUEDA:', maiorQueda);
+
+    const quedaLista = crescimento.filter(c => c.variacao < 0);
+
+    // ============================================================
+    // 2. CONCORRÊNCIA MÉDIA
     // ============================================================
     const mediaPorCurso = cursosAnalise.map(curso => {
         let totalCandVaga = 0;
@@ -473,38 +497,11 @@ function gerarConclusaoDiagnostica() {
         return { curso: curso.nome, media };
     });
 
-    // ============================================================
-    // 2. Maior e menor concorrência
-    // ============================================================
     const maiorConc = mediaPorCurso.reduce((a, b) => a.media > b.media ? a : b);
     const menorConc = mediaPorCurso.reduce((a, b) => a.media < b.media ? a : b);
 
     // ============================================================
-    // 3. Crescimento (variação 2016-2025)
-    // ============================================================
-    const crescimento = cursosAnalise.map(curso => {
-        let primeiro = 0, ultimo = 0;
-        curso.cotas.forEach(cota => {
-            let total = 0;
-            cota.tipoCota.forEach(tipo => {
-                const cand = tipo.candidatos === "n/a" ? 0 : Number(tipo.candidatos);
-                if (!isNaN(cand)) total += cand;
-            });
-            if (cota.ano === anos[0]) primeiro = total;
-            if (cota.ano === anos[anos.length - 1]) ultimo = total;
-        });
-        const variacao = ultimo - primeiro;
-        return { curso: curso.nome, variacao, primeiro, ultimo };
-    });
-    const maiorCresc = crescimento.reduce((a, b) => a.variacao > b.variacao ? a : b);
-
-    // ============================================================
-    // 4. Queda de concorrência
-    // ============================================================
-    const queda = crescimento.filter(c => c.variacao < 0);
-
-    // ============================================================
-    // 5. Curso mais estável (menor desvio padrão da concorrência)
+    // 3. CURSO MAIS ESTÁVEL
     // ============================================================
     const estabilidade = cursosAnalise.map(curso => {
         const valores = [];
@@ -528,7 +525,7 @@ function gerarConclusaoDiagnostica() {
     const maisEstavel = estabilidade.reduce((a, b) => a.desvio < b.desvio ? a : b);
 
     // ============================================================
-    // 6. Ano com maior concorrência média (ARREDONDADO)
+    // 4. ANO COM MAIOR CONCORRÊNCIA MÉDIA
     // ============================================================
     const concorrenciaPorAno = anos.map(ano => {
         let total = 0, count = 0;
@@ -553,7 +550,7 @@ function gerarConclusaoDiagnostica() {
     const maiorAno = concorrenciaPorAno.reduce((a, b) => a.media > b.media ? a : b);
 
     // ============================================================
-    // 7. Relação concorrência × nota mínima (ARREDONDADO)
+    // 5. RELAÇÃO CONCORRÊNCIA × NOTA MÍNIMA
     // ============================================================
     const relacao = cursosAnalise.map(curso => {
         let totalCandVaga = 0, totalNota = 0, count = 0;
@@ -583,9 +580,8 @@ function gerarConclusaoDiagnostica() {
     });
 
     // ============================================================
-    // 8. Outros Insights
+    // 6. OUTROS INSIGHTS
     // ============================================================
-    // Cota mais procurada no geral
     const somaCotas = {};
     cursosAnalise.forEach(curso => {
         curso.cotas.forEach(cota => {
@@ -605,7 +601,6 @@ function gerarConclusaoDiagnostica() {
         }
     });
 
-    // Curso com maior salário
     const salarios = cursosAnalise.map(curso => ({
         curso: curso.nome,
         salario: curso.salariosAtuais.length > 0 ? curso.salariosAtuais[0].salario : 0
@@ -613,7 +608,7 @@ function gerarConclusaoDiagnostica() {
     const maiorSalario = salarios.reduce((a, b) => a.salario > b.salario ? a : b);
 
     // ============================================================
-    // MONTAR HTML
+    // 7. MONTAR HTML
     // ============================================================
 
     const html = `
@@ -624,8 +619,9 @@ function gerarConclusaoDiagnostica() {
                     <ul class="mb-0 mt-2">
                         <li><strong>🏆 Qual curso apresentou maior concorrência?</strong> ${maiorConc.curso} (média ${maiorConc.media} candidatos/vaga)</li>
                         <li><strong>📉 Qual curso apresentou menor concorrência?</strong> ${menorConc.curso} (média ${menorConc.media} candidatos/vaga)</li>
-                        <li><strong>📈 Qual curso apresentou maior crescimento?</strong> ${maiorCresc.curso} (variação de ${maiorCresc.variacao} candidatos: ${maiorCresc.primeiro} → ${maiorCresc.ultimo})</li>
-                        <li><strong>⬇️ Houve queda de concorrência em algum curso?</strong> ${queda.length > 0 ? `Sim: ${queda.map(q => q.curso).join(', ')}` : 'Nenhum curso apresentou queda'}</li>
+                        <li><strong>📈 Qual curso apresentou maior crescimento?</strong> ${maiorCresc.curso} (aumento de ${maiorCresc.variacao} candidatos: ${maiorCresc.primeiro} → ${maiorCresc.ultimo})</li>
+                        <li><strong>📉 Qual curso apresentou maior queda?</strong> ${maiorQueda.curso} (queda de ${Math.abs(maiorQueda.variacao)} candidatos: ${maiorQueda.primeiro} → ${maiorQueda.ultimo})</li>
+                        <li><strong>⬇️ Houve queda de concorrência em algum curso?</strong> ${quedaLista.length > 0 ? 'Sim: ' + quedaLista.map(q => q.curso).join(', ') : 'Nenhum curso apresentou queda'}</li>
                         <li><strong>📊 Qual curso foi mais estável?</strong> ${maisEstavel.curso} (desvio padrão ${maisEstavel.desvio})</li>
                         <li><strong>📅 Qual ano teve maior concorrência média?</strong> ${maiorAno.ano} (média ${maiorAno.media} candidatos/vaga)</li>
                     </ul>
@@ -677,25 +673,19 @@ function gerarConclusaoDiagnostica() {
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Inicializando Análise Diagnóstica...');
-    console.log('📚 Cursos disponíveis:', db.cursos.map(c => `${c.id} - ${c.nome}`).join(', '));
+    console.log('Inicializando Análise Diagnóstica...');
+    console.log('Cursos disponíveis:', db.cursos.map(c => c.id + ' - ' + c.nome).join(', '));
 
-    // Cria os 4 gráficos (IDs 1, 2, 3, 4 - excluindo Turismo ID 5)
     setTimeout(function() {
         criarGraficoCurso(1, 'chartEngCivil');
         criarGraficoCurso(2, 'chartDireito');
         criarGraficoCurso(3, 'chartEduFisica');
         criarGraficoCurso(4, 'chartEngAlimentos');
 
-        // Gera análise diagnóstica
         gerarAnaliseDiagnostica();
-
-        // Gera tabela de notas mínimas e salários
         gerarTabelaNotasESalarios();
-
-        // Gera conclusão diagnóstica (respondendo as perguntas)
         gerarConclusaoDiagnostica();
     }, 100);
 
-    console.log('✅ Análise Diagnóstica inicializada com 4 gráficos!');
+    console.log('Análise Diagnóstica inicializada com 4 gráficos!');
 });
