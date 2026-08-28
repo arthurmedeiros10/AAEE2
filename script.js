@@ -42,11 +42,11 @@ function getDadosPorCota(curso, anos) {
 
 /** Paleta de cores para os tipos de cota */
 const CORES_COTAS = {
-    'negro': { bg: 'rgba(111, 66, 193, 0.3)', border: '#6f42c1' },        // Roxo
-    'publica': { bg: 'rgba(13, 110, 253, 0.3)', border: '#0d6efd' },       // Azul
-    'universal': { bg: 'rgba(25, 135, 84, 0.3)', border: '#198754' },      // Verde
-    'publica_negro': { bg: 'rgba(253, 126, 20, 0.3)', border: '#fd7e14' }, // Laranja
-    'pcd': { bg: 'rgba(220, 53, 69, 0.3)', border: '#dc3545' }             // Vermelho
+    'negro': { bg: 'rgba(111, 66, 193, 0.3)', border: '#6f42c1' },
+    'publica': { bg: 'rgba(13, 110, 253, 0.3)', border: '#0d6efd' },
+    'universal': { bg: 'rgba(25, 135, 84, 0.3)', border: '#198754' },
+    'publica_negro': { bg: 'rgba(253, 126, 20, 0.3)', border: '#fd7e14' },
+    'pcd': { bg: 'rgba(220, 53, 69, 0.3)', border: '#dc3545' }
 };
 
 /** Nomes amigáveis para os tipos de cota */
@@ -63,15 +63,31 @@ const NOMES_COTAS = {
 // ============================================================
 
 function criarGraficoCurso(cursoId, canvasId) {
+    // Busca o curso pelo ID
     const curso = db.cursos.find(c => c.id === cursoId);
     if (!curso) {
         console.error(`❌ Curso ID ${cursoId} não encontrado.`);
+        const canvas = document.getElementById(canvasId);
+        if (canvas) {
+            const parent = canvas.parentElement;
+            parent.innerHTML = `<p class="text-muted text-center py-4">⚠️ Curso não encontrado</p>`;
+        }
         return;
     }
 
-    console.log(`📊 Criando gráfico para: ${curso.nome}`);
+    console.log(`📊 Criando gráfico para: ${curso.nome} (ID ${curso.id})`);
 
     const anos = getAllAnos();
+    if (anos.length === 0) {
+        console.warn(`⚠️ Nenhum ano disponível para ${curso.nome}`);
+        const canvas = document.getElementById(canvasId);
+        if (canvas) {
+            const parent = canvas.parentElement;
+            parent.innerHTML = `<p class="text-muted text-center py-4">⚠️ Nenhum dado disponível</p>`;
+        }
+        return;
+    }
+
     const dadosPorCota = getDadosPorCota(curso, anos);
 
     // Monta os datasets
@@ -80,8 +96,8 @@ function criarGraficoCurso(cursoId, canvasId) {
         const cor = CORES_COTAS[tipo] || { bg: 'rgba(128, 128, 128, 0.3)', border: '#808080' };
         const dados = dadosPorCota[tipo];
 
-        // Pula se todos os dados forem zero
-        if (dados.every(v => v === 0)) return;
+        // Pula se todos os dados forem zero (exceto PCD, que deve aparecer como linha zero)
+        if (tipo !== 'pcd' && dados.every(v => v === 0)) return;
 
         datasets.push({
             label: NOMES_COTAS[tipo] || tipo,
@@ -198,16 +214,7 @@ function criarGraficoCurso(cursoId, canvasId) {
                         font: { size: 12, weight: 'bold' }
                     },
                     grid: { display: true, color: '#e9ecef' },
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: function() {
-                            const maxVal = Math.max(...datasets.flatMap(d => d.data));
-                            if (maxVal > 500) return 100;
-                            if (maxVal > 200) return 50;
-                            if (maxVal > 100) return 25;
-                            return 10;
-                        }
-                    }
+                    beginAtZero: true
                 }
             },
             interaction: {
@@ -221,7 +228,7 @@ function criarGraficoCurso(cursoId, canvasId) {
     if (!window.charts) window.charts = {};
     window.charts[canvasId] = chart;
 
-    console.log(`✅ Gráfico criado: ${curso.nome} (${canvasId})`);
+    console.log(`✅ Gráfico criado: ${curso.nome} (${canvasId}) com ${datasets.length} linhas`);
 }
 
 // ============================================================
@@ -345,6 +352,7 @@ function gerarAnaliseDiagnostica() {
                         <li><strong>Engenharia de Alimentos</strong> tem demanda crescente, refletindo tendências do mercado.</li>
                         <li>A cota <strong>Ampla Concorrência</strong> é a mais procurada em todos os cursos.</li>
                         <li>Cotas <strong>PCD</strong> e <strong>Pública + Negro</strong> têm menor volume de candidatos.</li>
+                        <li>A cota <strong>PCD</strong> em Engenharia de Alimentos não registrou candidatos em nenhum ano.</li>
                     </ul>
                 </div>
             </div>
@@ -363,13 +371,15 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('📚 Cursos disponíveis:', db.cursos.map(c => `${c.id} - ${c.nome}`).join(', '));
 
     // Cria os 4 gráficos (IDs 1, 2, 3, 4 - excluindo Turismo ID 5)
-    criarGraficoCurso(1, 'chartEngCivil');
-    criarGraficoCurso(2, 'chartDireito');
-    criarGraficoCurso(3, 'chartEduFisica');
-    criarGraficoCurso(4, 'chartEngAlimentos');
+    setTimeout(function() {
+        criarGraficoCurso(1, 'chartEngCivil');
+        criarGraficoCurso(2, 'chartDireito');
+        criarGraficoCurso(3, 'chartEduFisica');
+        criarGraficoCurso(4, 'chartEngAlimentos');
 
-    // Gera análise diagnóstica
-    gerarAnaliseDiagnostica();
+        // Gera análise diagnóstica
+        gerarAnaliseDiagnostica();
+    }, 100);
 
     console.log('✅ Análise Diagnóstica inicializada com 4 gráficos!');
 });
