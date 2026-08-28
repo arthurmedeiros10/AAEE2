@@ -59,6 +59,14 @@ const NOMES_COTAS = {
 };
 
 // ============================================================
+// FUNÇÃO PARA ARREDONDAR NÚMEROS PARA INTEIROS
+// ============================================================
+
+function arredondarParaInteiro(valor) {
+    return Math.round(valor);
+}
+
+// ============================================================
 // CRIA UM GRÁFICO INDIVIDUAL PARA UM CURSO
 // ============================================================
 
@@ -186,14 +194,14 @@ function criarGraficoCurso(cursoId, canvasId) {
                         label: function(context) {
                             const label = context.dataset.label || '';
                             const valor = context.parsed.y;
-                            return `${label}: ${valor} candidato${valor !== 1 ? 's' : ''}`;
+                            return `${label}: ${Math.round(valor)} candidato${Math.round(valor) !== 1 ? 's' : ''}`;
                         },
                         footer: function(tooltipItems) {
                             let total = 0;
                             tooltipItems.forEach(item => {
                                 total += item.parsed.y;
                             });
-                            return `📊 Total: ${total} candidatos`;
+                            return `📊 Total: ${Math.round(total)} candidatos`;
                         }
                     }
                 }
@@ -214,7 +222,12 @@ function criarGraficoCurso(cursoId, canvasId) {
                         font: { size: 12, weight: 'bold' }
                     },
                     grid: { display: true, color: '#e9ecef' },
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return Math.round(value);
+                        }
+                    }
                 }
             },
             interaction: {
@@ -229,6 +242,82 @@ function criarGraficoCurso(cursoId, canvasId) {
     window.charts[canvasId] = chart;
 
     console.log(`✅ Gráfico criado: ${curso.nome} (${canvasId}) com ${datasets.length} linhas`);
+}
+
+// ============================================================
+// GERAR TABELA DE NOTAS MÍNIMAS E SALÁRIOS
+// ============================================================
+
+function gerarTabelaNotasESalarios() {
+    const container = document.getElementById('tabelaContainer');
+    if (!container) return;
+
+    // Cursos para análise (excluindo Turismo - ID 5)
+    const cursosAnalise = db.cursos.filter(c => c.id !== 5);
+    const anos = getAllAnos();
+
+    let html = `
+        <div class="table-responsive mt-3">
+            <h5 class="mb-3"><i class="fas fa-table me-2"></i>Notas Mínimas por Curso e Ano</h5>
+            <table class="table table-bordered table-hover table-striped">
+                <thead class="table-primary">
+                    <tr>
+                        <th class="text-center align-middle" style="min-width: 200px;">Curso</th>
+                        <th class="text-center align-middle">Salário Médio</th>
+    `;
+
+    // Cabeçalho dos anos
+    anos.forEach(ano => {
+        html += `<th class="text-center">${ano}</th>`;
+    });
+
+    html += `
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    // Linhas para cada curso
+    cursosAnalise.forEach(curso => {
+        // Pega o salário do curso
+        const salario = curso.salariosAtuais.length > 0 
+            ? `R$ ${curso.salariosAtuais[0].salario.toFixed(2)}` 
+            : 'N/A';
+
+        html += `
+            <tr>
+                <td><strong>${curso.nome}</strong></td>
+                <td class="text-center text-success fw-bold">${salario}</td>
+        `;
+
+        // Para cada ano, pega a nota mínima da cota universal (ampla concorrência)
+        anos.forEach(ano => {
+            let notaMinima = 'N/A';
+            const cotaAno = curso.cotas.find(c => c.ano === ano);
+            if (cotaAno) {
+                const universal = cotaAno.tipoCota.find(t => t.tipo === 'universal');
+                if (universal && universal.notaMinima !== "n/a") {
+                    notaMinima = universal.notaMinima;
+                }
+            }
+            html += `<td class="text-center">${notaMinima}</td>`;
+        });
+
+        html += `</tr>`;
+    });
+
+    html += `
+                </tbody>
+            </table>
+            <p class="text-muted small mt-2">
+                <i class="fas fa-info-circle me-1"></i>
+                Notas mínimas da cota <strong>Ampla Concorrência (Universal)</strong> por ano.
+                Valores marcados como "N/A" indicam dados não disponíveis.
+            </p>
+        </div>
+    `;
+
+    container.innerHTML = html;
 }
 
 // ============================================================
@@ -267,7 +356,7 @@ function gerarAnaliseDiagnostica() {
                 if (!isNaN(vag)) totalVagas[ano] += vag;
             });
             concorrencia[ano] = totalVagas[ano] > 0 
-                ? (totalCandidatos[ano] / totalVagas[ano]).toFixed(2) 
+                ? Math.round(totalCandidatos[ano] / totalVagas[ano]) 
                 : 0;
         });
 
@@ -343,16 +432,237 @@ function gerarAnaliseDiagnostica() {
     });
 
     html += `
-            <div class="col-12 mt-3">
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+// ============================================================
+// GERAR CONCLUSÃO DIAGNÓSTICA (RESPONDENDO AS PERGUNTAS)
+// ============================================================
+
+function gerarConclusaoDiagnostica() {
+    const container = document.getElementById('conclusaoContainer');
+    if (!container) return;
+
+    // Cursos para análise (excluindo Turismo - ID 5)
+    const cursosAnalise = db.cursos.filter(c => c.id !== 5);
+    const anos = getAllAnos();
+
+    // ============================================================
+    // 1. Calcular concorrência média por curso (ARREDONDADO)
+    // ============================================================
+    const mediaPorCurso = cursosAnalise.map(curso => {
+        let totalCandVaga = 0;
+        let count = 0;
+        curso.cotas.forEach(cota => {
+            let totalCand = 0, totalVag = 0;
+            cota.tipoCota.forEach(tipo => {
+                const cand = tipo.candidatos === "n/a" ? 0 : Number(tipo.candidatos);
+                const vag = tipo.vagas === "n/a" ? 0 : Number(tipo.vagas);
+                if (!isNaN(cand)) totalCand += cand;
+                if (!isNaN(vag)) totalVag += vag;
+            });
+            if (totalVag > 0) {
+                totalCandVaga += totalCand / totalVag;
+                count++;
+            }
+        });
+        const media = count > 0 ? Math.round(totalCandVaga / count) : 0;
+        return { curso: curso.nome, media };
+    });
+
+    // ============================================================
+    // 2. Maior e menor concorrência
+    // ============================================================
+    const maiorConc = mediaPorCurso.reduce((a, b) => a.media > b.media ? a : b);
+    const menorConc = mediaPorCurso.reduce((a, b) => a.media < b.media ? a : b);
+
+    // ============================================================
+    // 3. Crescimento (variação 2016-2025)
+    // ============================================================
+    const crescimento = cursosAnalise.map(curso => {
+        let primeiro = 0, ultimo = 0;
+        curso.cotas.forEach(cota => {
+            let total = 0;
+            cota.tipoCota.forEach(tipo => {
+                const cand = tipo.candidatos === "n/a" ? 0 : Number(tipo.candidatos);
+                if (!isNaN(cand)) total += cand;
+            });
+            if (cota.ano === anos[0]) primeiro = total;
+            if (cota.ano === anos[anos.length - 1]) ultimo = total;
+        });
+        const variacao = ultimo - primeiro;
+        return { curso: curso.nome, variacao, primeiro, ultimo };
+    });
+    const maiorCresc = crescimento.reduce((a, b) => a.variacao > b.variacao ? a : b);
+
+    // ============================================================
+    // 4. Queda de concorrência
+    // ============================================================
+    const queda = crescimento.filter(c => c.variacao < 0);
+
+    // ============================================================
+    // 5. Curso mais estável (menor desvio padrão da concorrência)
+    // ============================================================
+    const estabilidade = cursosAnalise.map(curso => {
+        const valores = [];
+        curso.cotas.forEach(cota => {
+            let totalCand = 0, totalVag = 0;
+            cota.tipoCota.forEach(tipo => {
+                const cand = tipo.candidatos === "n/a" ? 0 : Number(tipo.candidatos);
+                const vag = tipo.vagas === "n/a" ? 0 : Number(tipo.vagas);
+                if (!isNaN(cand)) totalCand += cand;
+                if (!isNaN(vag)) totalVag += vag;
+            });
+            if (totalVag > 0) {
+                valores.push(totalCand / totalVag);
+            }
+        });
+        const media = valores.reduce((a, b) => a + b, 0) / valores.length;
+        const variancia = valores.reduce((a, b) => a + Math.pow(b - media, 2), 0) / valores.length;
+        const desvio = parseFloat(Math.sqrt(variancia).toFixed(2));
+        return { curso: curso.nome, desvio };
+    });
+    const maisEstavel = estabilidade.reduce((a, b) => a.desvio < b.desvio ? a : b);
+
+    // ============================================================
+    // 6. Ano com maior concorrência média (ARREDONDADO)
+    // ============================================================
+    const concorrenciaPorAno = anos.map(ano => {
+        let total = 0, count = 0;
+        cursosAnalise.forEach(curso => {
+            const cotaAno = curso.cotas.find(c => c.ano === ano);
+            if (cotaAno) {
+                let totalCand = 0, totalVag = 0;
+                cotaAno.tipoCota.forEach(tipo => {
+                    const cand = tipo.candidatos === "n/a" ? 0 : Number(tipo.candidatos);
+                    const vag = tipo.vagas === "n/a" ? 0 : Number(tipo.vagas);
+                    if (!isNaN(cand)) totalCand += cand;
+                    if (!isNaN(vag)) totalVag += vag;
+                });
+                if (totalVag > 0) {
+                    total += totalCand / totalVag;
+                    count++;
+                }
+            }
+        });
+        return { ano, media: count > 0 ? Math.round(total / count) : 0 };
+    });
+    const maiorAno = concorrenciaPorAno.reduce((a, b) => a.media > b.media ? a : b);
+
+    // ============================================================
+    // 7. Relação concorrência × nota mínima (ARREDONDADO)
+    // ============================================================
+    const relacao = cursosAnalise.map(curso => {
+        let totalCandVaga = 0, totalNota = 0, count = 0;
+        curso.cotas.forEach(cota => {
+            cota.tipoCota.forEach(tipo => {
+                if (tipo.tipo === 'universal' && tipo.notaMinima !== "n/a") {
+                    let totalCand = 0, totalVag = 0;
+                    cota.tipoCota.forEach(t => {
+                        const cand = t.candidatos === "n/a" ? 0 : Number(t.candidatos);
+                        const vag = t.vagas === "n/a" ? 0 : Number(t.vagas);
+                        if (!isNaN(cand)) totalCand += cand;
+                        if (!isNaN(vag)) totalVag += vag;
+                    });
+                    if (totalVag > 0) {
+                        totalCandVaga += totalCand / totalVag;
+                        totalNota += Number(tipo.notaMinima);
+                        count++;
+                    }
+                }
+            });
+        });
+        return {
+            curso: curso.nome,
+            candVagaMedia: count > 0 ? Math.round(totalCandVaga / count) : 0,
+            notaMedia: count > 0 ? Math.round(totalNota / count) : 0
+        };
+    });
+
+    // ============================================================
+    // 8. Outros Insights
+    // ============================================================
+    // Cota mais procurada no geral
+    const somaCotas = {};
+    cursosAnalise.forEach(curso => {
+        curso.cotas.forEach(cota => {
+            cota.tipoCota.forEach(tipo => {
+                if (!somaCotas[tipo.tipo]) somaCotas[tipo.tipo] = 0;
+                const cand = tipo.candidatos === "n/a" ? 0 : Number(tipo.candidatos);
+                if (!isNaN(cand)) somaCotas[tipo.tipo] += cand;
+            });
+        });
+    });
+    let cotaMaisProcuradaGeral = '';
+    let maiorValorCota = 0;
+    Object.keys(somaCotas).forEach(tipo => {
+        if (somaCotas[tipo] > maiorValorCota) {
+            maiorValorCota = somaCotas[tipo];
+            cotaMaisProcuradaGeral = NOMES_COTAS[tipo] || tipo;
+        }
+    });
+
+    // Curso com maior salário
+    const salarios = cursosAnalise.map(curso => ({
+        curso: curso.nome,
+        salario: curso.salariosAtuais.length > 0 ? curso.salariosAtuais[0].salario : 0
+    }));
+    const maiorSalario = salarios.reduce((a, b) => a.salario > b.salario ? a : b);
+
+    // ============================================================
+    // MONTAR HTML
+    // ============================================================
+
+    const html = `
+        <div class="row">
+            <div class="col-12">
                 <div class="insight-box">
-                    <strong>💡 Conclusão Diagnóstica</strong>
+                    <strong>📋 Resumo das Perguntas</strong>
                     <ul class="mb-0 mt-2">
-                        <li><strong>Direito</strong> e <strong>Engenharia Civil</strong> mantêm alta demanda estável.</li>
-                        <li><strong>Educação Física</strong> apresentou queda significativa pós-2020, possivelmente devido à pandemia.</li>
-                        <li><strong>Engenharia de Alimentos</strong> tem demanda crescente, refletindo tendências do mercado.</li>
-                        <li>A cota <strong>Ampla Concorrência</strong> é a mais procurada em todos os cursos.</li>
-                        <li>Cotas <strong>PCD</strong> e <strong>Pública + Negro</strong> têm menor volume de candidatos.</li>
-                        <li>A cota <strong>PCD</strong> em Engenharia de Alimentos não registrou candidatos em nenhum ano.</li>
+                        <li><strong>🏆 Qual curso apresentou maior concorrência?</strong> ${maiorConc.curso} (média ${maiorConc.media} candidatos/vaga)</li>
+                        <li><strong>📉 Qual curso apresentou menor concorrência?</strong> ${menorConc.curso} (média ${menorConc.media} candidatos/vaga)</li>
+                        <li><strong>📈 Qual curso apresentou maior crescimento?</strong> ${maiorCresc.curso} (variação de ${maiorCresc.variacao} candidatos: ${maiorCresc.primeiro} → ${maiorCresc.ultimo})</li>
+                        <li><strong>⬇️ Houve queda de concorrência em algum curso?</strong> ${queda.length > 0 ? `Sim: ${queda.map(q => q.curso).join(', ')}` : 'Nenhum curso apresentou queda'}</li>
+                        <li><strong>📊 Qual curso foi mais estável?</strong> ${maisEstavel.curso} (desvio padrão ${maisEstavel.desvio})</li>
+                        <li><strong>📅 Qual ano teve maior concorrência média?</strong> ${maiorAno.ano} (média ${maiorAno.media} candidatos/vaga)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="insight-box">
+                    <strong>🔗 Existe relação entre concorrência e nota mínima?</strong>
+                    <ul class="mb-0 mt-2">
+                        ${relacao.map(r => `
+                            <li>• <strong>${r.curso}:</strong> ${r.candVagaMedia} cand/vaga ↔ ${r.notaMedia} pontos de nota mínima</li>
+                        `).join('')}
+                        <li class="mt-2 text-muted small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Nota: Cursos com maior concorrência tendem a ter notas mínimas mais altas,
+                            especialmente em <strong>Direito</strong> e <strong>Engenharia Civil</strong>.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="insight-box">
+                    <strong>💡 Outros Insights (Conclusões Adicionais)</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>💰 <strong>Maior salário:</strong> ${maiorSalario.curso} (R$ ${maiorSalario.salario.toFixed(2)})</li>
+                        <li>🎯 <strong>Cota mais procurada (geral):</strong> ${cotaMaisProcuradaGeral} (${maiorValorCota} candidatos no total)</li>
+                        <li>📉 <strong>Educação Física</strong> apresentou queda significativa pós-2020, possivelmente devido à pandemia.</li>
+                        <li>📈 <strong>Engenharia de Alimentos</strong> tem demanda crescente, refletindo tendências do mercado.</li>
+                        <li>⚖️ <strong>Direito</strong> e <strong>Engenharia Civil</strong> mantêm alta demanda estável ao longo dos anos.</li>
+                        <li>🔴 A cota <strong>PCD</strong> em Engenharia de Alimentos não registrou candidatos em nenhum ano.</li>
+                        <li>📊 A cota <strong>Ampla Concorrência</strong> é a mais procurada em todos os cursos analisados.</li>
                     </ul>
                 </div>
             </div>
@@ -379,6 +689,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Gera análise diagnóstica
         gerarAnaliseDiagnostica();
+
+        // Gera tabela de notas mínimas e salários
+        gerarTabelaNotasESalarios();
+
+        // Gera conclusão diagnóstica (respondendo as perguntas)
+        gerarConclusaoDiagnostica();
     }, 100);
 
     console.log('✅ Análise Diagnóstica inicializada com 4 gráficos!');
